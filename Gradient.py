@@ -1,59 +1,107 @@
 import numpy as np
+import matplotlib.pyplot as plt
+import tkinter as tk
+from tkinter import ttk
 
 def gradient_descent(f, grad_f, x0, epsilon1, epsilon2, M, t):
-    # Шаг 1: Задать x0, параметры epsilon1, epsilon2, M, шаг t
     xk = np.array(x0, dtype=float)
     k = 0
+    history = []
     
-    print(f"{'k':<5}{'xk[0]':<12}{'xk[1]':<12}{'f(xk)':<12}{'grad f(xk)[0]':<15}{'grad f(xk)[1]':<15}{'||grad f(xk)||':<15}{'tk':<10}{'xk+1[0]':<12}{'xk+1[1]':<12}")
-    
-    # Шаг 2: Положить k = 0
     while True:
-        # Шаг 3: Вычислить f(xk)
         fxk = f(xk)
         grad_fxk = grad_f(xk)
         norm_grad = np.linalg.norm(grad_fxk)
         
-        # Шаг 4: Проверить выполнение критерия окончания | f(x*)| < ε1
         if norm_grad < epsilon1:
-            return xk
+            return xk, history
         
-        # Шаг 5: Проверить выполнение условия k ≥ M
         if k >= M:
-            return xk
+            return xk, history
         
-        # Шаг 6: Задать величину шага tk (у нас он фиксированный)
-        
-        # Шаг 7: Вычислить xk+1 = xk - tk * grad_f(xk)
         xk1 = xk - t * grad_fxk
         
-        # Шаг 8: Проверить выполнение условия убывания функции
         if not (f(xk1) - fxk < 0 or abs(f(xk1) - fxk) < epsilon1 * np.linalg.norm(grad_fxk)):
-            continue  # Если условие не выполняется, повторяем шаг 7
+            continue
         
-        # Вывод текущего шага
-        print(f"{k:<5}{xk[0]:<12.6f}{xk[1]:<12.6f}{fxk:<12.6f}{grad_fxk[0]:<15.6f}{grad_fxk[1]:<15.6f}{norm_grad:<15.6f}{t:<10.6f}{xk1[0]:<12.6f}{xk1[1]:<12.6f}")
+        history.append((k, xk[0], xk[1], fxk, grad_fxk[0], grad_fxk[1], norm_grad, t, xk1[0], xk1[1]))
         
-        # Шаг 9: Проверка сходимости
         if np.linalg.norm(xk1 - xk) < epsilon2 and abs(f(xk1) - fxk) < epsilon2:
-            return xk1
+            return xk1, history
         
         xk = xk1
         k += 1
 
-# Пример использования
 def f(x):
-    return 2*x[0]**2 + x[0]*x[1] + x[1]**2  # Заданная функция
+    return 2*x[0]**2 + x[0]*x[1] + x[1]**2
 
 def grad_f(x):
-    return np.array([4*x[0] + x[1], x[0] + 2*x[1]])  # Градиент функции
+    return np.array([4*x[0] + x[1], x[0] + 2*x[1]])
 
-x0 = [0.5, 1]  # Начальная точка
-epsilon1 = 0.1
-epsilon2 = 0.15
-M = 10
-t = 0.24  # Фиксированный шаг
+def run_gradient_descent():
+    x0 = [float(entry_x0_0.get()), float(entry_x0_1.get())]
+    epsilon1 = float(entry_epsilon1.get())
+    epsilon2 = float(entry_epsilon2.get())
+    M = int(entry_M.get())
+    t = float(entry_t.get())
+    
+    x_opt, history = gradient_descent(f, grad_f, x0, epsilon1, epsilon2, M, t)
+    result_text.set(f"Локальный минимум: {x_opt}\nЗначение функции: {f(x_opt)}")
+    
+    for row in table.get_children():
+        table.delete(row)
+    
+    for data in history:
+        table.insert("", "end", values=data)
+    
+    history = np.array(history)
+    plt.figure()
+    plt.plot(history[:, 0], history[:, 3], marker='o', linestyle='-')
+    plt.xlabel("Итерация")
+    plt.ylabel("Значение функции")
+    plt.title("Сходимость градиентного спуска")
+    plt.grid()
+    plt.show()
 
-x_opt = gradient_descent(f, grad_f, x0, epsilon1, epsilon2, M, t)
-print("Локальный минимум найден в точке:", x_opt)
-print("Значение функции в этой точке:", f(x_opt))
+root = tk.Tk()
+root.title("Градиентный спуск")
+
+tk.Label(root, text="x0[0]:").grid(row=0, column=0)
+entry_x0_0 = tk.Entry(root)
+entry_x0_0.grid(row=0, column=1)
+
+tk.Label(root, text="x0[1]:").grid(row=1, column=0)
+entry_x0_1 = tk.Entry(root)
+entry_x0_1.grid(row=1, column=1)
+
+tk.Label(root, text="epsilon1:").grid(row=2, column=0)
+entry_epsilon1 = tk.Entry(root)
+entry_epsilon1.grid(row=2, column=1)
+
+tk.Label(root, text="epsilon2:").grid(row=3, column=0)
+entry_epsilon2 = tk.Entry(root)
+entry_epsilon2.grid(row=3, column=1)
+
+tk.Label(root, text="M:").grid(row=4, column=0)
+entry_M = tk.Entry(root)
+entry_M.grid(row=4, column=1)
+
+tk.Label(root, text="t:").grid(row=5, column=0)
+entry_t = tk.Entry(root)
+entry_t.grid(row=5, column=1)
+
+tk.Button(root, text="Запустить", command=run_gradient_descent).grid(row=6, column=0, columnspan=2)
+
+result_text = tk.StringVar()
+tk.Label(root, textvariable=result_text).grid(row=7, column=0, columnspan=2)
+
+columns = ("k", "xk[0]", "xk[1]", "f(xk)", "grad f(xk)[0]", "grad f(xk)[1]", "||grad f(xk)||", "tk", "xk+1[0]", "xk+1[1]")
+table = ttk.Treeview(root, columns=columns, show="headings")
+
+for col in columns:
+    table.heading(col, text=col)
+    table.column(col, width=100)
+
+table.grid(row=8, column=0, columnspan=2)
+
+root.mainloop()
