@@ -1,137 +1,134 @@
-import tkinter as tk
-from tkinter import messagebox, ttk
 import numpy as np
 import matplotlib.pyplot as plt
-import sympy as sp
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import tkinter as tk
+from mpl_toolkits.mplot3d import Axes3D
 
-# Символьные переменные
-x1, x2 = sp.symbols('x1 x2')
+# Функция и её градиент
+def f(x):
+    return 2 * x[0]**2 + x[0] * x[1] + x[1]**2  # Новая функция
 
-# Функция для минимизации (по умолчанию)
-default_function = 2*x1**2 + x1*x2 + x2**2
+def grad_f(x):
+    return np.array([4*x[0] + x[1], x[0] + 2*x[1]])  # Градиент функции
 
-# Функция для вычисления градиента автоматически
-def compute_gradient(func):
-    grad = [sp.diff(func, var) for var in (x1, x2)]
-    return sp.lambdify((x1, x2), grad, 'numpy')
-
-# Градиент целевой функции
-grad_f = compute_gradient(default_function)
-f_func = sp.lambdify((x1, x2), default_function, 'numpy')
-
-# Метод градиентного спуска с историей итераций
-def gradient_descent(x0, step_size, epsilon1, epsilon2, max_iter):
+# Алгоритм градиентного спуска
+def gradient_descent(x0, epsilon, epsilon1, epsilon2, M):
     xk = np.array(x0, dtype=float)
-    history = []
-    
-    for k in range(max_iter):
-        fxk = f_func(xk[0], xk[1])
-        grad_fxk = np.array(grad_f(xk[0], xk[1]))
-        norm_grad = np.linalg.norm(grad_fxk)
-        
-        if norm_grad < epsilon1:
-            break
-        
-        x_next = xk - step_size * grad_fxk
-        
-        history.append((k, xk[0], xk[1], fxk, grad_fxk[0], grad_fxk[1], norm_grad, step_size, x_next[0], x_next[1]))
-        
-        if np.linalg.norm(x_next - xk) < epsilon2 and abs(f_func(x_next[0], x_next[1]) - fxk) < epsilon2:
-            break
-        
-        xk = x_next
-    
-    return xk, history
+    k = 0
+    trajectory = [xk.copy()]  # Для визуализации траектории
 
-# Интерфейс приложения
-def run_gui():
-    def start_optimization():
-        try:
-            x0 = [float(entry_x0.get()), float(entry_y0.get())]
-            step_size = float(entry_step.get())
-            epsilon1 = float(entry_eps1.get())
-            epsilon2 = float(entry_eps2.get())
-            max_iter = int(entry_max_iter.get())
-        except ValueError:
-            messagebox.showerror("Ошибка", "Введите корректные числовые значения")
-            return
-        
-        x_min, history = gradient_descent(x0, step_size, epsilon1, epsilon2, max_iter)
-        result_label.config(text=f"Найденный минимум: ({x_min[0]:.4f}, {x_min[1]:.4f})")
-        update_table(history)
-        plot_results(history)
-    
-    def update_table(history):
-        for row in table.get_children():
-            table.delete(row)
-        
-        for data in history:
-            table.insert("", "end", values=[round(val, 4) if isinstance(val, float) else val for val in data])
-    
-    def plot_results(history):
-        history = np.array(history)
-        
-        plt.figure(figsize=(6,6))
-        plt.plot(history[:,1], history[:,2], 'o-')
-        
-        x_vals = np.linspace(-2, 2, 100)
-        y_vals = np.linspace(-2, 2, 100)
-        X, Y = np.meshgrid(x_vals, y_vals)
-        Z = f_func(X, Y)
-        plt.contour(X, Y, Z, levels=30, cmap='viridis')
-        
-        plt.xlabel('X')
-        plt.ylabel('Y')
-        plt.title('Градиентный спуск')
-        plt.show()
-    
-    root = tk.Tk()
-    root.title("Градиентный спуск")
-    
-    tk.Label(root, text="Начальная точка (x0, y0):").grid(row=0, column=0)
-    entry_x0 = tk.Entry(root, width=5)
-    entry_x0.insert(0, "0.5")
-    entry_x0.grid(row=0, column=1)
-    entry_y0 = tk.Entry(root, width=5)
-    entry_y0.insert(0, "1.0")
-    entry_y0.grid(row=0, column=2)
-    
-    tk.Label(root, text="Шаг спуска:").grid(row=1, column=0)
-    entry_step = tk.Entry(root, width=10)
-    entry_step.insert(0, "0.24")
-    entry_step.grid(row=1, column=1)
-    
-    tk.Label(root, text="Epsilon 1:").grid(row=2, column=0)
-    entry_eps1 = tk.Entry(root, width=10)
-    entry_eps1.insert(0, "0.1")
-    entry_eps1.grid(row=2, column=1)
-    
-    tk.Label(root, text="Epsilon 2:").grid(row=3, column=0)
-    entry_eps2 = tk.Entry(root, width=10)
-    entry_eps2.insert(0, "0.15")
-    entry_eps2.grid(row=3, column=1)
-    
-    tk.Label(root, text="Максимальное число итераций:").grid(row=4, column=0)
-    entry_max_iter = tk.Entry(root, width=10)
-    entry_max_iter.insert(0, "10")
-    entry_max_iter.grid(row=4, column=1)
-    
-    start_button = tk.Button(root, text="Запуск", command=start_optimization)
-    start_button.grid(row=5, column=0, columnspan=2)
-    
-    result_label = tk.Label(root, text="")
-    result_label.grid(row=6, column=0, columnspan=3)
-    
-    columns = ("k", "xk[0]", "xk[1]", "f(xk)", "grad_x[0]", "grad_x[1]", "||grad||", "t", "xk+1[0]", "xk+1[1]")
-    table = ttk.Treeview(root, columns=columns, show="headings")
-    
-    for col in columns:
-        table.heading(col, text=col)
-        table.column(col, width=80)
-    
-    table.grid(row=7, column=0, columnspan=3)
-    
-    root.mainloop()
+    while k < M:
+        fxk = f(xk)
 
-if __name__ == "__main__":
-    run_gui()
+        if abs(fxk) < epsilon1:  # Проверка критерия окончания
+            break
+
+        tk = 0.1  # Фиксированный шаг
+        grad_fxk = grad_f(xk)
+        xk_next = xk - tk * grad_fxk
+
+        if f(xk_next) - fxk >= 0 and abs(f(xk_next) - fxk) >= epsilon * np.linalg.norm(grad_fxk):
+            continue  # Повторяем с другим tk
+
+        if np.linalg.norm(xk_next - xk) < epsilon2 and abs(f(xk_next) - fxk) < epsilon2:
+            xk = xk_next
+            break
+
+        xk = xk_next
+        trajectory.append(xk.copy())  # Запоминаем траекторию
+        k += 1
+
+    return xk, trajectory
+
+# Функция для запуска градиентного спуска
+def run_gradient_descent():
+    x0 = np.array([float(entry_x0.get()), float(entry_y0.get())])
+    epsilon = float(entry_epsilon.get())
+    epsilon1 = float(entry_epsilon1.get())
+    epsilon2 = float(entry_epsilon2.get())
+    M = int(entry_M.get())
+
+    x_star, trajectory = gradient_descent(x0, epsilon, epsilon1, epsilon2, M)
+    label_result.config(text=f"Оптимальное решение: ({x_star[0]:.5f}, {x_star[1]:.5f})")
+
+    # Отображение 3D-графика
+    plot_gradient_descent_3D(trajectory)
+
+# Построение 3D-графика градиентного спуска
+def plot_gradient_descent_3D(trajectory):
+    trajectory = np.array(trajectory)
+
+    fig = plt.figure(figsize=(6, 6))
+    ax = fig.add_subplot(111, projection='3d')
+
+    x_vals = np.linspace(-10, 10, 100)
+    y_vals = np.linspace(-10, 10, 100)
+    X, Y = np.meshgrid(x_vals, y_vals)
+    Z = 2 * X**2 + X * Y + Y**2  # Новая функция
+
+    ax.plot_surface(X, Y, Z, cmap="viridis", alpha=0.6)  # Поверхность функции
+    ax.plot(trajectory[:, 0], trajectory[:, 1], f(trajectory.T), marker="o", color="red", linestyle="-", label="Траектория")
+
+    ax.set_title("3D Градиентный спуск")
+    ax.set_xlabel("x1")
+    ax.set_ylabel("x2")
+    ax.set_zlabel("f(x1, x2)")
+    ax.legend()
+
+    # Отображение графика в Tkinter
+    for widget in frame_graph.winfo_children():
+        widget.destroy()
+
+    canvas = FigureCanvasTkAgg(fig, master=frame_graph)
+    canvas.draw()
+    canvas.get_tk_widget().pack()
+
+# Создание GUI
+root = tk.Tk()
+root.title("Градиентный спуск (3D)")
+
+frame_controls = tk.Frame(root)
+frame_controls.pack(side=tk.LEFT, padx=10, pady=10)
+
+frame_graph = tk.Frame(root)
+frame_graph.pack(side=tk.RIGHT, padx=10, pady=10)
+
+# Поля для ввода параметров
+tk.Label(frame_controls, text="Начальные координаты:").pack()
+entry_x0 = tk.Entry(frame_controls)
+entry_x0.pack()
+entry_x0.insert(0, "10")  # По умолчанию x0 = 10
+
+entry_y0 = tk.Entry(frame_controls)
+entry_y0.pack()
+entry_y0.insert(0, "-5")  # По умолчанию y0 = -5
+
+tk.Label(frame_controls, text="epsilon:").pack()
+entry_epsilon = tk.Entry(frame_controls)
+entry_epsilon.pack()
+entry_epsilon.insert(0, "1e-5")
+
+tk.Label(frame_controls, text="epsilon1:").pack()
+entry_epsilon1 = tk.Entry(frame_controls)
+entry_epsilon1.pack()
+entry_epsilon1.insert(0, "1e-6")
+
+tk.Label(frame_controls, text="epsilon2:").pack()
+entry_epsilon2 = tk.Entry(frame_controls)
+entry_epsilon2.pack()
+entry_epsilon2.insert(0, "1e-6")
+
+tk.Label(frame_controls, text="Макс. итерации M:").pack()
+entry_M = tk.Entry(frame_controls)
+entry_M.pack()
+entry_M.insert(0, "1000")
+
+# Кнопка запуска
+btn_run = tk.Button(frame_controls, text="Запустить", command=run_gradient_descent)
+btn_run.pack(pady=5)
+
+# Вывод результата
+label_result = tk.Label(frame_controls, text="Оптимальное решение: ")
+label_result.pack()
+
+root.mainloop()
