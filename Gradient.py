@@ -1,134 +1,175 @@
+import dash
+from dash import dcc, html, Input, Output, State, dash_table
+import plotly.graph_objs as go
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import tkinter as tk
-from mpl_toolkits.mplot3d import Axes3D
+import dash_bootstrap_components as dbc
 
-# Функция и её градиент
-def f(x):
-    return 2 * x[0]**2 + x[0] * x[1] + x[1]**2  # Новая функция
+# Функция Бута
+def func(x, y):
+    return (1 - x) ** 2 + 100 * (y - x ** 2) ** 2
+def gradient(x, y, h=1e-5):
+    df_dx = (func(x + h, y) - func(x - h, y)) / (2 * h)
+    df_dy = (func(x, y + h) - func(x, y - h)) / (2 * h)
+    return np.array([df_dx, df_dy])
 
-def grad_f(x):
-    return np.array([4*x[0] + x[1], x[0] + 2*x[1]])  # Градиент функции
+def gradient_descent(x0, y0, learning_rate=0.1, epsilon=1e-6, epsilon1=1e-6, epsilon2=1e-6, max_iter=100):
+    history = []
+    current_point = np.array([x0, y0])
+    
+    for i in range(max_iter):   
+        grad = gradient(*current_point)
+        current_value = func(*current_point)
+        
+        if np.any(np.abs(grad) > 1e10):
+            return history, False, "Функция расходится (норма градиента слишком большая)"
+        
+        
+        grad_norm = np.linalg.norm(grad)
+        
+        history.append({
+            'iteration': i+1,
+            'x': current_point[0],
+            'y': current_point[1],
+            'f_value': current_value,
+            'grad_norm': grad_norm
+        })
+        
+        if grad_norm < epsilon1:
+            return history, True, "Сошёлся (норма градиента меньше заданной точности)"
+        
+        old_point = current_point 
+        current_point = current_point - learning_rate * grad
+        modified_learning_rate = learning_rate
 
-# Алгоритм градиентного спуска
-def gradient_descent(x0, epsilon, epsilon1, epsilon2, M):
-    xk = np.array(x0, dtype=float)
-    k = 0
-    trajectory = [xk.copy()]  # Для визуализации траектории
+        while not(func(*current_point) - func(*old_point)) < 0:
+            modified_learning_rate = modified_learning_rate / 2
+            current_point = old_point - modified_learning_rate * grad
 
-    while k < M:
-        fxk = f(xk)
+        if (np.linalg.norm(current_point-old_point) < epsilon2) and (np.linalg.norm(func(*current_point)-func(*old_point)) < epsilon2):
+            return history, True, "Сошёлся (разница значений функции меньше заданной точности)" 
+    
+    return history, False, "Не сошёлся (достигнуто максимальное количество итераций)"
 
-        if abs(fxk) < epsilon1:  # Проверка критерия окончания
-            break
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.SOLAR])
+server = app.server
 
-        tk = 0.1  # Фиксированный шаг
-        grad_fxk = grad_f(xk)
-        xk_next = xk - tk * grad_fxk
+app.layout = dbc.Container([
+    html.H1("Градиентный спуск с постоянным шагом", className='text-center mt-4 mb-4'),
 
-        if f(xk_next) - fxk >= 0 and abs(f(xk_next) - fxk) >= epsilon * np.linalg.norm(grad_fxk):
-            continue  # Повторяем с другим tk
+    dbc.Row([
+        dbc.Col([
+            dbc.Card([
+                dbc.CardHeader("Параметры", className="bg-primary text-white text-center"),
+                dbc.CardBody([
+                    dbc.Row([
+                        dbc.Col([html.Label("X₀")], width=4),
+                        dbc.Col([dbc.Input(id='x0-input', type='number', value=0)], width=8),
+                    ], className="mb-2"),
 
-        if np.linalg.norm(xk_next - xk) < epsilon2 and abs(f(xk_next) - fxk) < epsilon2:
-            xk = xk_next
-            break
+                    dbc.Row([
+                        dbc.Col([html.Label("Y₀")], width=4),
+                        dbc.Col([dbc.Input(id='y0-input', type='number', value=0)], width=8),
+                    ], className="mb-2"),
 
-        xk = xk_next
-        trajectory.append(xk.copy())  # Запоминаем траекторию
-        k += 1
+                    dbc.Row([
+                        dbc.Col([html.Label("Шаг")], width=4),
+                        dbc.Col([dbc.Input(id='lr-input', type='number', value=0.1, step=0.01)], width=8),
+                    ], className="mb-2"),
 
-    return xk, trajectory
+                    dbc.Row([
+                        dbc.Col([html.Label("Точность ε")], width=4),
+                        dbc.Col([dbc.Input(id='epsilon-input', type='number', value=1e-4, step=1e-6)], width=8),
+                    ], className="mb-2"),
 
-# Функция для запуска градиентного спуска
-def run_gradient_descent():
-    x0 = np.array([float(entry_x0.get()), float(entry_y0.get())])
-    epsilon = float(entry_epsilon.get())
-    epsilon1 = float(entry_epsilon1.get())
-    epsilon2 = float(entry_epsilon2.get())
-    M = int(entry_M.get())
+                    dbc.Row([
+                        dbc.Col([html.Label("Макс. итераций")], width=4),
+                        dbc.Col([dbc.Input(id='max-iter-input', type='number', value=100)], width=8),
+                    ], className="mb-3"),
 
-    x_star, trajectory = gradient_descent(x0, epsilon, epsilon1, epsilon2, M)
-    label_result.config(text=f"Оптимальное решение: ({x_star[0]:.5f}, {x_star[1]:.5f})")
+                    dbc.Button("Запустить", id='run-button', color='success', className='w-100 mt-3')
+                ])
+            ], className="mb-4")
+        ], md=4),
 
-    # Отображение 3D-графика
-    plot_gradient_descent_3D(trajectory)
+        dbc.Col([
+            dcc.Graph(id='3d-plot', style={'height': '450px'}),
+            html.Div(id='results-table', className='mt-3'),
+        ], md=8),
+    ]),
 
-# Построение 3D-графика градиентного спуска
-def plot_gradient_descent_3D(trajectory):
-    trajectory = np.array(trajectory)
+    dbc.Row([
+        dbc.Col([
+            dbc.Alert(id='final-result', color="dark", className='mt-3 text-center')
+        ])
+    ]),
+], fluid=True)
 
-    fig = plt.figure(figsize=(6, 6))
-    ax = fig.add_subplot(111, projection='3d')
 
-    x_vals = np.linspace(-10, 10, 100)
-    y_vals = np.linspace(-10, 10, 100)
-    X, Y = np.meshgrid(x_vals, y_vals)
-    Z = 2 * X**2 + X * Y + Y**2  # Новая функция
+@app.callback(
+    [Output('3d-plot', 'figure'),
+     Output('results-table', 'children'),
+     Output('final-result', 'children'),
+     Output('final-result', 'color')],
+    [Input('run-button', 'n_clicks')],
+    [State('x0-input', 'value'),
+     State('y0-input', 'value'),
+     State('lr-input', 'value'),
+     State('epsilon-input', 'value'),
+     State('max-iter-input', 'value')]
+)
+def update_plot_and_table(n_clicks, x0, y0, lr, epsilon, max_iter):
+    if None in [x0, y0, lr, epsilon, max_iter]:
+        return go.Figure(), "Пожалуйста, заполните все поля", "", "danger"
+    
+    history, converged, status_message = gradient_descent(x0, y0, lr, epsilon, epsilon, epsilon, max_iter)
+    
+    if history:
+        final = history[-1]
+        result_message = f"""
+        Финальная точка: ({round(final['x'], 4)}, {round(final['y'], 4)})  
+        Значение функции: {round(final['f_value'], 4)}  
+        Итераций выполнено: {final['iteration']}  
+        Состояние: {status_message}
+        """
+        color = "success" if converged else "warning"
+    else:
+        result_message = "Не удалось выполнить оптимизацию"
+        color = "danger"
+    
+    x = np.linspace(-10, 10, 100)
+    y = np.linspace(-10, 10, 100)
+    X, Y = np.meshgrid(x, y)
+    Z = func(X, Y)
+    
+    trajectory_x = [point['x'] for point in history]
+    trajectory_y = [point['y'] for point in history]
+    trajectory_z = [point['f_value'] for point in history]
+    
+    fig = go.Figure(data=[
+        go.Surface(x=X, y=Y, z=Z, colorscale='Plasma', opacity=0.8),
+        go.Scatter3d(
+            x=trajectory_x,
+            y=trajectory_y,
+            z=trajectory_z,
+            mode='lines+markers',
+            marker=dict(size=5, color='red'),
+            line=dict(color='red', width=2)
+        )
+    ])
+    
+    fig.update_layout(
+        scene=dict(xaxis_title='X', yaxis_title='Y', zaxis_title='f(x, y)'),
+        margin=dict(l=0, r=0, b=0, t=30)
+    )
+    
+    table = dash_table.DataTable(
+        columns=[{'name': i, 'id': i} for i in history[0].keys()],
+        data=history,
+        page_size=10,
+        style_table={'overflowX': 'auto'}
+    )
+    
+    return fig, table, result_message, color
 
-    ax.plot_surface(X, Y, Z, cmap="viridis", alpha=0.6)  # Поверхность функции
-    ax.plot(trajectory[:, 0], trajectory[:, 1], f(trajectory.T), marker="o", color="red", linestyle="-", label="Траектория")
-
-    ax.set_title("3D Градиентный спуск")
-    ax.set_xlabel("x1")
-    ax.set_ylabel("x2")
-    ax.set_zlabel("f(x1, x2)")
-    ax.legend()
-
-    # Отображение графика в Tkinter
-    for widget in frame_graph.winfo_children():
-        widget.destroy()
-
-    canvas = FigureCanvasTkAgg(fig, master=frame_graph)
-    canvas.draw()
-    canvas.get_tk_widget().pack()
-
-# Создание GUI
-root = tk.Tk()
-root.title("Градиентный спуск (3D)")
-
-frame_controls = tk.Frame(root)
-frame_controls.pack(side=tk.LEFT, padx=10, pady=10)
-
-frame_graph = tk.Frame(root)
-frame_graph.pack(side=tk.RIGHT, padx=10, pady=10)
-
-# Поля для ввода параметров
-tk.Label(frame_controls, text="Начальные координаты:").pack()
-entry_x0 = tk.Entry(frame_controls)
-entry_x0.pack()
-entry_x0.insert(0, "10")  # По умолчанию x0 = 10
-
-entry_y0 = tk.Entry(frame_controls)
-entry_y0.pack()
-entry_y0.insert(0, "-5")  # По умолчанию y0 = -5
-
-tk.Label(frame_controls, text="epsilon:").pack()
-entry_epsilon = tk.Entry(frame_controls)
-entry_epsilon.pack()
-entry_epsilon.insert(0, "1e-5")
-
-tk.Label(frame_controls, text="epsilon1:").pack()
-entry_epsilon1 = tk.Entry(frame_controls)
-entry_epsilon1.pack()
-entry_epsilon1.insert(0, "1e-6")
-
-tk.Label(frame_controls, text="epsilon2:").pack()
-entry_epsilon2 = tk.Entry(frame_controls)
-entry_epsilon2.pack()
-entry_epsilon2.insert(0, "1e-6")
-
-tk.Label(frame_controls, text="Макс. итерации M:").pack()
-entry_M = tk.Entry(frame_controls)
-entry_M.pack()
-entry_M.insert(0, "1000")
-
-# Кнопка запуска
-btn_run = tk.Button(frame_controls, text="Запустить", command=run_gradient_descent)
-btn_run.pack(pady=5)
-
-# Вывод результата
-label_result = tk.Label(frame_controls, text="Оптимальное решение: ")
-label_result.pack()
-
-root.mainloop()
+if __name__ == '__main__':
+    app.run_server(debug=True)
