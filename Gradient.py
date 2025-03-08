@@ -4,26 +4,23 @@ import plotly.graph_objs as go
 import numpy as np
 import dash_bootstrap_components as dbc
 
-# Функция Бута
+
 def func(x, y):
+    #return 2*x**2 + 2*x*y + y**2
     return (1 - x) ** 2 + 100 * (y - x ** 2) ** 2
 def gradient(x, y, h=1e-5):
     df_dx = (func(x + h, y) - func(x - h, y)) / (2 * h)
     df_dy = (func(x, y + h) - func(x, y - h)) / (2 * h)
     return np.array([df_dx, df_dy])
 
-def gradient_descent(x0, y0, learning_rate=0.1, epsilon=1e-6, epsilon1=1e-6, epsilon2=1e-6, max_iter=100):
+def gradient_descent(x0, y0, step=0.1, epsilon=1e-6, epsilon1=1e-6, epsilon2=1e-6, max_iter=100):
     history = []
     current_point = np.array([x0, y0])
     
     for i in range(max_iter):   
         grad = gradient(*current_point)
         current_value = func(*current_point)
-        
-        if np.any(np.abs(grad) > 1e10):
-            return history, False, "Функция расходится (норма градиента слишком большая)"
-        
-        
+                
         grad_norm = np.linalg.norm(grad)
         
         history.append({
@@ -38,12 +35,12 @@ def gradient_descent(x0, y0, learning_rate=0.1, epsilon=1e-6, epsilon1=1e-6, eps
             return history, True, "Сошёлся (норма градиента меньше заданной точности)"
         
         old_point = current_point 
-        current_point = current_point - learning_rate * grad
-        modified_learning_rate = learning_rate
+        current_point = current_point - step * grad
+        modified_step = step
 
         while not(func(*current_point) - func(*old_point)) < 0:
-            modified_learning_rate = modified_learning_rate / 2
-            current_point = old_point - modified_learning_rate * grad
+            modified_step = modified_step / 2
+            current_point = old_point - modified_step * grad
 
         if (np.linalg.norm(current_point-old_point) < epsilon2) and (np.linalg.norm(func(*current_point)-func(*old_point)) < epsilon2):
             return history, True, "Сошёлся (разница значений функции меньше заданной точности)" 
