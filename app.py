@@ -19,17 +19,16 @@ app.layout = dbc.Container([
     
     dbc.Alert(id='final-result', color="success", className='mt-3'),
     
+    dbc.Tabs([
+        dbc.Tab(label="Градиентный спуск", tab_id="gradient-tab"),
+        dbc.Tab(label="Симплекс-метод", tab_id="simplex-tab"),
+    ], id="method-tabs", active_tab="gradient-tab"),
+    
     dbc.Row([
         dbc.Col([
             dbc.Card([
                 dbc.CardBody([
-                    html.H4("Выбор метода", className="card-title"),
-                    dcc.Dropdown(
-                        id="method-dropdown",
-                        options=[{"label": name, "value": name} for name in methods.keys()],
-                        value="Градиентный спуск",
-                        clearable=False
-                    ),
+                    html.H4("Параметры метода", className="card-title"),
                     html.Div(id='method-params')
                 ])
             ])
@@ -44,10 +43,10 @@ app.layout = dbc.Container([
 
 @app.callback(
     Output('method-params', 'children'),
-    Input('method-dropdown', 'value')
+    Input('method-tabs', 'active_tab')
 )
-def update_params(method_name):
-    if method_name == "Градиентный спуск":
+def update_params(active_tab):
+    if active_tab == "gradient-tab":
         return html.Div([
             dbc.InputGroup([
                     dbc.InputGroupText("X₀"),
@@ -86,7 +85,7 @@ def update_params(method_name):
                 
                 dbc.Button("Запустить", id='gradient-run-button', color='primary', className='mt-3')
             ])
-    elif method_name == "Симплекс-метод":
+    elif active_tab == "simplex-tab":
         return html.Div([
             dbc.InputGroup([
                 dbc.InputGroupText("x₁₀"),
