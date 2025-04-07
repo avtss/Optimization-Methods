@@ -4,7 +4,7 @@ import plotly.graph_objs as go
 import numpy as np
 import dash_bootstrap_components as dbc
 
-from methods import gradient_descent, simplex_method
+from methods import gradient_descent, simplex_method, genetic_algorithm
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.SOLAR], suppress_callback_exceptions=True, prevent_initial_callbacks='initial_duplicate')
 server = app.server
@@ -12,6 +12,14 @@ server = app.server
 methods = {
     "Градиентный спуск": gradient_descent,
     "Симплекс-метод": simplex_method,
+    "Генетический алгоритм": genetic_algorithm,
+}
+
+optimization_functions = {
+    "Функция Розенброка": "rosenbrock",
+    "Функция Букина N6": "bukin",
+    "Функция Химмельблау": "himmelblau",
+    "Функция Изома": "isom"
 }
 
 app.layout = dbc.Container([
@@ -19,16 +27,20 @@ app.layout = dbc.Container([
     
     dbc.Alert(id='final-result', color="success", className='mt-3'),
     
-    dbc.Tabs([
-        dbc.Tab(label="Градиентный спуск", tab_id="gradient-tab"),
-        dbc.Tab(label="Симплекс-метод", tab_id="simplex-tab"),
-    ], id="method-tabs", active_tab="gradient-tab"),
-    
     dbc.Row([
         dbc.Col([
             dbc.Card([
                 dbc.CardBody([
-                    html.H4("Параметры метода", className="card-title"),
+                    html.H4("Выбор метода", className="card-title"),
+                    dcc.Tabs(
+                        id='method-tabs',
+                        value='Градиентный спуск',  # Default selected method
+                        children=[
+                            dcc.Tab(label='Градиентный спуск', value='Градиентный спуск'),
+                            dcc.Tab(label='Симплекс-метод', value='Симплекс-метод'),
+                            dcc.Tab(label='Генетический алгоритм', value='Генетический алгоритм')
+                        ],
+                    ),
                     html.Div(id='method-params')
                 ])
             ])
@@ -43,129 +55,51 @@ app.layout = dbc.Container([
 
 @app.callback(
     Output('method-params', 'children'),
-    Input('method-tabs', 'active_tab')
+    Input('method-tabs', 'value')
 )
-def update_params(active_tab):
-    if active_tab == "gradient-tab":
+def update_params(method_name):
+    if method_name == "Градиентный спуск":
         return html.Div([
-            dbc.InputGroup([
-                    dbc.InputGroupText("X₀"),
-                    dbc.Input(id='gradient-x0-input', type='number', value=0)
-                ], className='mb-2'),
-                
-                dbc.InputGroup([
-                    dbc.InputGroupText("Y₀"),
-                    dbc.Input(id='gradient-y0-input', type='number', value=0)
-                ], className='mb-2'),
-                
-                dbc.InputGroup([
-                    dbc.InputGroupText("Шаг"),
-                    dbc.Input(id='gradient-lr-input', type='number', value=0.1, step=0.01)
-                ], className='mb-2'),
-
-                dbc.InputGroup([
-                    dbc.InputGroupText("Точность ε (проверка убывания)"),
-                    dbc.Input(id='gradient-epsilon-input', type='number', value=1e-4, step=1e-6)
-                ], className='mb-2'),
-                
-                dbc.InputGroup([
-                    dbc.InputGroupText("Точность ε1 (норма градиента в точке)"),
-                    dbc.Input(id='gradient-epsilon1-input', type='number', value=1e-4, step=1e-6)
-                ], className='mb-2'),
-
-                dbc.InputGroup([
-                    dbc.InputGroupText("Точность ε2 (разность значений функций)"),
-                    dbc.Input(id='gradient-epsilon2-input', type='number', value=1e-4, step=1e-6)
-                ], className='mb-2'),
-                
-                dbc.InputGroup([
-                    dbc.InputGroupText("Макс. итераций"),
-                    dbc.Input(id='gradient-max-iter-input', type='number', value=100)
-                ], className='mb-2'),
-                
-                dbc.Button("Запустить", id='gradient-run-button', color='primary', className='mt-3')
-            ])
-    elif active_tab == "simplex-tab":
+            dbc.InputGroup([dbc.InputGroupText("X₀"), dbc.Input(id='gradient-x0-input', type='number', value=0)], className='mb-2'),
+            dbc.InputGroup([dbc.InputGroupText("Y₀"), dbc.Input(id='gradient-y0-input', type='number', value=0)], className='mb-2'),
+            dbc.InputGroup([dbc.InputGroupText("Шаг"), dbc.Input(id='gradient-lr-input', type='number', value=0.1, step=0.01)], className='mb-2'),
+            dbc.InputGroup([dbc.InputGroupText("Точность ε"), dbc.Input(id='gradient-epsilon-input', type='number', value=1e-4, step=1e-6)], className='mb-2'),
+            dbc.InputGroup([dbc.InputGroupText("Точность ε1"), dbc.Input(id='gradient-epsilon1-input', type='number', value=1e-4, step=1e-6)], className='mb-2'),
+            dbc.InputGroup([dbc.InputGroupText("Точность ε2"), dbc.Input(id='gradient-epsilon2-input', type='number', value=1e-4, step=1e-6)], className='mb-2'),
+            dbc.InputGroup([dbc.InputGroupText("Макс. итераций"), dbc.Input(id='gradient-max-iter-input', type='number', value=100)], className='mb-2'),
+            dbc.Button("Запустить", id='gradient-run-button', color='primary', className='mt-3')
+        ])
+    elif method_name == "Симплекс-метод":
         return html.Div([
-            dbc.InputGroup([
-                dbc.InputGroupText("x₁₀"),
-                dbc.Input(id='simplex-x1-0-input', type='number', value=0)
-            ], className='mb-2'),
-            
-            dbc.InputGroup([
-                dbc.InputGroupText("x₂₀"),
-                dbc.Input(id='simplex-x2-0-input', type='number', value=0)
-            ], className='mb-2'),
-
+            dbc.InputGroup([dbc.InputGroupText("x₁₀"), dbc.Input(id='simplex-x1-0-input', type='number', value=0)], className='mb-2'),
+            dbc.InputGroup([dbc.InputGroupText("x₂₀"), dbc.Input(id='simplex-x2-0-input', type='number', value=0)], className='mb-2'),
             html.H4("Целевая функция F: a₁x₁² + a₂x₂² + a₃x₁x₂ + a₄x₁ + a₅x₂"),
-            
-            dbc.InputGroup([
-                dbc.InputGroupText("Коэффициент​ x₁²"),
-                dbc.Input(id='simplex-x1-2-input', type='number', value=0)
-            ], className='mb-2'),
-
-            dbc.InputGroup([
-                dbc.InputGroupText("Коэффициент x₂²"),
-                dbc.Input(id='simplex-x2-2-input', type='number', value=0)
-            ], className='mb-2'),
-            
-            dbc.InputGroup([
-                dbc.InputGroupText("Коэффициент x₁x₂"),
-                dbc.Input(id='simplex-x1x2-input', type='number', value=0)
-            ], className='mb-2'),
-
-            dbc.InputGroup([
-                dbc.InputGroupText("Коэффициент x₁"),
-                dbc.Input(id='simplex-x1-input', type='number', value=0)
-            ], className='mb-2'),
-            
-            dbc.InputGroup([
-                dbc.InputGroupText("Коэффициент x₂"),
-                dbc.Input(id='simplex-x2-input', type='number', value=0)
-            ], className='mb-2'),
-            
-            html.H4("Условное ограничение 1: a₁x₁ + b₁x₂ ≤ c₁"),
-
-            dbc.InputGroup([
-                dbc.InputGroupText("Коэффициент a₁"),
-                dbc.Input(id='simplex-a1-input', type='number', value=0)
-            ], className='mb-2'),
-
-            dbc.InputGroup([
-                dbc.InputGroupText("Коэффициент b₁"),
-                dbc.Input(id='simplex-b1-input', type='number', value=0)
-            ], className='mb-2'),
-            
-            dbc.InputGroup([
-                dbc.InputGroupText("Коэффициент c₁"),
-                dbc.Input(id='simplex-c1-input', type='number', value=0)
-            ], className='mb-2'),
-
-            html.H4("Условное ограничение 2: a₂x₁ + b₂x₂ ≤ c₂"),
-
-            dbc.InputGroup([
-                dbc.InputGroupText("Коэффициент a₂"),
-                dbc.Input(id='simplex-a2-input', type='number', value=0)
-            ], className='mb-2'),
-
-            dbc.InputGroup([
-                dbc.InputGroupText("Коэффициент b₂"),
-                dbc.Input(id='simplex-b2-input', type='number', value=0)
-            ], className='mb-2'),
-            
-            dbc.InputGroup([
-                dbc.InputGroupText("Коэффициент c₂"),
-                dbc.Input(id='simplex-c2-input', type='number', value=0)
-            ], className='mb-2'),
-
-            dcc.Dropdown(
-                id="simplex-type",
-                options=["Минимум", "Максимум"],
-                value="Минимум",
-                clearable=False
-            ),
-
+            dbc.InputGroup([dbc.InputGroupText("Коэффициент x₁²"), dbc.Input(id='simplex-x1-2-input', type='number', value=0)], className='mb-2'),
+            dbc.InputGroup([dbc.InputGroupText("Коэффициент x₂²"), dbc.Input(id='simplex-x2-2-input', type='number', value=0)], className='mb-2'),
+            dbc.InputGroup([dbc.InputGroupText("Коэффициент x₁x₂"), dbc.Input(id='simplex-x1x2-input', type='number', value=0)], className='mb-2'),
+            dbc.InputGroup([dbc.InputGroupText("Коэффициент x₁"), dbc.Input(id='simplex-x1-input', type='number', value=0)], className='mb-2'),
+            dbc.InputGroup([dbc.InputGroupText("Коэффициент x₂"), dbc.Input(id='simplex-x2-input', type='number', value=0)], className='mb-2'),
+            dbc.InputGroup([dbc.InputGroupText("Коэффициент a₁"), dbc.Input(id='simplex-a1-input', type='number', value=0)], className='mb-2'),
+            dbc.InputGroup([dbc.InputGroupText("Коэффициент b₁"), dbc.Input(id='simplex-b1-input', type='number', value=0)], className='mb-2'),
+            dbc.InputGroup([dbc.InputGroupText("Коэффициент c₁"), dbc.Input(id='simplex-c1-input', type='number', value=0)], className='mb-2'),
+            dbc.InputGroup([dbc.InputGroupText("Коэффициент a₂"), dbc.Input(id='simplex-a2-input', type='number', value=0)], className='mb-2'),
+            dbc.InputGroup([dbc.InputGroupText("Коэффициент b₂"), dbc.Input(id='simplex-b2-input', type='number', value=0)], className='mb-2'),
+            dbc.InputGroup([dbc.InputGroupText("Коэффициент c₂"), dbc.Input(id='simplex-c2-input', type='number', value=0)], className='mb-2'),
+            dcc.Dropdown(id="simplex-type", options=["Минимум", "Максимум"], value="Минимум", clearable=False),
             dbc.Button("Запустить", id='simplex-run-button', color='primary', className='mt-3')
+        ])
+    elif method_name == "Генетический алгоритм":
+        return html.Div([
+            dbc.InputGroup([dbc.InputGroupText("Функция"), dcc.Dropdown(id="genetic-function-dropdown", options=[{"label": name, "value": optimization_functions[name]} for name in optimization_functions.keys()], value="rosenbrock", clearable=False, style={'width': '100%'})], className='mb-2'),
+            dbc.InputGroup([dbc.InputGroupText("Количество хромосом"), dbc.Input(id='genetic-chromosome-number-input', type='number', value=1000)], className='mb-2'),
+            dbc.InputGroup([dbc.InputGroupText("Макс. итераций"), dbc.Input(id='genetic-max-iter-input', type='number', value=25)], className='mb-2'),
+            dbc.InputGroup([dbc.InputGroupText("Интервал поиска (x)"), dbc.Input(id='genetic-x-min-input', type='number', value=-3), dbc.Input(id='genetic-x-max-input', type='number', value=3)], className='mb-2'),
+            dbc.InputGroup([dbc.InputGroupText("Интервал поиска (y)"), dbc.Input(id='genetic-y-min-input', type='number', value=-3), dbc.Input(id='genetic-y-max-input', type='number', value=3)], className='mb-2'),
+            dbc.InputGroup([dbc.InputGroupText("Вероятность скрещивания"), dbc.Input(id='genetic-crossover-prob-input', type='number', value=0.7)], className='mb-2'),
+            dbc.InputGroup([dbc.InputGroupText("Вероятность мутации"), dbc.Input(id='genetic-mutation-prob-input', type='number', value=0.1)], className='mb-2'),
+            dbc.InputGroup([dbc.InputGroupText("Параметр мутации"), dbc.Input(id='genetic-mutation-parameter-input', type='number', value=10)], className='mb-2'),
+            dbc.Checklist(options=[{"label": "Использовать скрещивание", "value": "crossover"}, {"label": "Использовать мутацию", "value": "mutation"}], value=["crossover", "mutation"], id="genetic-operations-checkboxes", switch=True, className='mb-2'),
+            dbc.Button("Запустить", id='genetic-run-button', color='primary', className='mt-3')
         ])
     return html.Div()
 
@@ -217,10 +151,44 @@ def update_plot_and_table_simplex(n_clicks, x0, y0, x12, x22, x1x2, x1, x2, a1, 
     if None in [x0, y0, x12, x22, x1x2, x1, x2, a1, b1, c1, a2, b2, c2, type]:
         return go.Figure(), "Пожалуйста, заполните все поля", "", "danger"
     
-    return update_plot_and_table("simplex", simplex_method.objective_param([x12, x22, x1x2, x1, x2]), *simplex_method.optimize([x0, y0], [x12, x22, x1x2, x1, x2], [a1, b1, c1, a2, b2, c2] if (any([x != 0 for x in [a1, b1, c1]]) and any([x != 0 for x in [a2, b2, c2]])) else [a1, b1, c1] if (any([x != 0 for x in [a1, b1, c1]]) and all([x == 0 for x in [a2, b2, c2]])) else [a2, b2, c2] if (all([x == 0 for x in [a1, b1, c1]]) and any([x != 0 for x in [a2, b2, c2]])) else [], "minimize" if type=="Минимум" else "maximize"), [[a1, b1, c1, a2, b2, c2]])
+    return update_plot_and_table("simplex", simplex_method.objective_param([x12, x22, x1x2, x1, x2]), *simplex_method.optimize([x0, y0], [x12, x22, x1x2, x1, x2], [a1, b1, c1, a2, b2, c2] if (any([x != 0 for x in [a1, b1, c1]]) and any([x != 0 for x in [a2, b2, c2]])) else [a1, b1, c1] if (any([x != 0 for x in [a1, b1, c1]]) and all([x == 0 for x in [a2, b2, c2]])) else [a2, b2, c2] if (all([x == 0 for x in [a1, b1, c1]]) and any([x != 0 for x in [a2, b2, c2]])) else [], "minimize" if type=="Минимум" else "maximize"), {'simplex_coefficients': [a1, b1, c1, a2, b2, c2]})
 
+@app.callback(
+    [Output('3d-plot', 'figure', allow_duplicate=True),
+     Output('results-table', 'children', allow_duplicate=True),
+     Output('final-result', 'children', allow_duplicate=True),
+     Output('final-result', 'color', allow_duplicate=True)],
+    [Input('genetic-run-button', 'n_clicks')],
+    [
+     State('genetic-function-dropdown', 'value'),
+     State('genetic-chromosome-number-input', 'value'),
+     State('genetic-max-iter-input', 'value'),
+     State('genetic-x-min-input', 'value'),
+     State('genetic-x-max-input', 'value'),
+     State('genetic-y-min-input', 'value'),
+     State('genetic-y-max-input', 'value'),
+     State('genetic-crossover-prob-input', 'value'),
+     State('genetic-mutation-prob-input', 'value'),
+     State('genetic-mutation-parameter-input', 'value'),
+     State('genetic-operations-checkboxes', 'value'),
+     ],
+    prevent_initial_call=True
+)
+def update_plot_and_table_genetic(n_clicks, func, chromosome_number, max_iter, x_min, x_max, y_min, y_max, crossover_prob, mutation_prob, mutation_param, operations):
+    func = genetic_algorithm.functions(func)
+    if None in [func, chromosome_number, max_iter, x_min, x_max, y_min, y_max, crossover_prob, mutation_prob, mutation_param, operations]:
+        print([func, chromosome_number, max_iter, x_min, x_max, y_min, y_max, crossover_prob, mutation_prob, mutation_param, operations])
+        return go.Figure(), "Пожалуйста, заполните все поля", "", "danger"
 
-def update_plot_and_table(method, func, history, converged, status_message, options=None):
+    return update_plot_and_table("genetic", func, *genetic_algorithm.optimize(func, [[x_min, x_max], [y_min, y_max]], {"crossover": "crossover" in operations, "mutation": "mutation" in operations}, chromosome_number, crossover_prob, mutation_prob, mutation_param, max_iter), {"bounds": [x_min, x_max, y_min, y_max]})
+
+def update_plot_and_table(method, func, history, converged, status_message, options=None, optional_options=None):
+    if options is None:
+        options = {}
+    
+    if 'optional_history' not in options:
+        options['optional_history'] = []
+        
     if history:
         final = history[-1]
         result_message = [
@@ -241,6 +209,10 @@ def update_plot_and_table(method, func, history, converged, status_message, opti
     
     x = np.linspace(0, 20, 100)
     y = np.linspace(0, 20, 100)
+    if method == 'genetic':
+        x_min, x_max, y_min, y_max = options["bounds"]
+        x = np.linspace(x_min, x_max, 100)
+        y = np.linspace(y_min, y_max, 100)
     X, Y = np.meshgrid(x, y)
     Z = func(X, Y)
     
@@ -261,7 +233,7 @@ def update_plot_and_table(method, func, history, converged, status_message, opti
     ])
     
     if method == "simplex":
-        a1, b1, c1, a2, b2, c2 = options[0]
+        a1, b1, c1, a2, b2, c2 = options['simplex_coefficients']
         
         if any([x !=0 for x in [a1, b1, c1]]):
             func1 = lambda x1, x2: a1*x1 + b1*x2 - c1
@@ -289,19 +261,28 @@ def update_plot_and_table(method, func, history, converged, status_message, opti
         {'name': 'f(x,y)', 'id': 'f_value'}, 
     ]
 
-    if method == "gradient":
-        columns.append({'name': 'Норма градиента', 'id': 'grad_norm'})
-    
     formatted_history = [
         {
             'iteration': item['iteration'],
             'x': round(item['x'], 4),
             'y': round(item['y'], 4),
             'f_value': round(item['f_value'], 4),
-            'grad_norm': round(item['grad_norm'], 4)
+            
         }
         for item in history
     ]
+    
+    if method == 'gradient':
+        columns.append({'name': 'Норма градиента', 'id': 'grad_norm'})
+        formatted_optional_history = [{
+                'grad_norm': round(item['grad_norm'], 4) if 'grad_norm' in item else 0
+            }
+            for item in options['optional_history']
+        ]
+        if len(formatted_optional_history) < len(formatted_history):
+            formatted_optional_history.extend([{'grad_norm': 0}] * (len(formatted_history) - len(formatted_optional_history)))
+        for i in range(len(formatted_history)):
+            formatted_history[i]['grad_norm'] = formatted_optional_history[i]['grad_norm']
 
     table = dash_table.DataTable(
         id='results-datatable',
