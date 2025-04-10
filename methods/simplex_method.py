@@ -1,15 +1,14 @@
 from scipy.optimize import minimize, linprog
 import numpy as np
+#SLSQP
 
-
-# целевая функция 2-ух переменных
 def objective(x, coeffs):
     x1, x2 = x[0], x[1]
     return coeffs[0] * x1 ** 2 + coeffs[1] * x2 ** 2 + coeffs[2] * x1 * x2 + coeffs[3] * x1 + coeffs[4] * x2
 
 def objective_param(coeffs):
     return lambda x1, x2: coeffs[0] * x1 ** 2 + coeffs[1] * x2 ** 2 + coeffs[2] * x1 * x2 + coeffs[3] * x1 + coeffs[4] * x2
-
+#задаем ограничения в виде неравенств
 def constraints(coeffs_con):
     cons = []
     for i in range(0, len(coeffs_con), 3):
@@ -21,7 +20,7 @@ def constraints(coeffs_con):
     cons.append({'type': 'ineq', 'fun': lambda x: x[0]})
     cons.append({'type': 'ineq', 'fun': lambda x: x[1]})
     return cons
-
+#строим квадратичную апроксимацию целевой функции и линейную апроксимацию ограничений потом решается QP
 def optimize(x0, coeffs_obj, coeffs_con, type):
     
     if type == "minimize":
