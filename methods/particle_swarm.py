@@ -2,13 +2,13 @@ import numpy as np
 
 class Particle:
     def __init__(self, swarm):
-        self._position = self.getInitPosition(swarm)
+        self._position = self.getInitPosition(swarm)#начальная позиция
 
-        self._localBestPosition = self._position[:]
+        self._localBestPosition = self._position[:]#сохраняем как лучшее решение
 
-        self._localBestValue = swarm.getFuncValue(self._position)
+        self._localBestValue = swarm.getFuncValue(self._position)#считаем и запоминаем как лучшее значение
 
-        self._velocity = self.getInitVelocity(swarm)
+        self._velocity = self.getInitVelocity(swarm)#начальная скорость частицы
 
 
     @property
@@ -19,11 +19,11 @@ class Particle:
     def velocity(self):
         return self._velocity
     
-
+  #Создаёт случайную точку внутри диапазона
     def getInitPosition(self, swarm):
         return np.random.rand(swarm.dimension) * (swarm.maxvalues - swarm.minvalues) + swarm.minvalues
     
-
+    #Задаёт начальную скорость 
     def getInitVelocity(self, swarm):
         minval = -(swarm.maxvalues - swarm.minvalues)
         maxval = swarm.maxvalues - swarm.minvalues
@@ -32,25 +32,27 @@ class Particle:
     
 
     def nextIteration(self, swarm):
+        #векторы  инерции и тяготения к лучшим позициям
         random_currentPosition = np.random.rand(swarm.dimension)
         random_globalPosition = np.random.rand(swarm.dimension)
-
+        
+        #влияние локального и глобального лучшего решения
         velocityRatio = swarm.localVelocityRatio + swarm.globalVelocityRatio
-
+        #Вычисляется коэффициент,используется для масштабирования всей скорости 
         commonRatio = (2.0*swarm.currentVelocityRatio) / (np.abs(2.0 - velocityRatio - np.sqrt(velocityRatio**2 - 4.0*velocityRatio)))
 
-        newVelocity1 = commonRatio * self._velocity 
-        newVelocity2 = commonRatio * swarm.localVelocityRatio * random_currentPosition * (self._localBestPosition - self._position)
-        newVelocity3 = commonRatio * swarm.globalVelocityRatio * random_globalPosition * (swarm.globalBestPosition - self._position)
+        newVelocity1 = commonRatio * self._velocity #инерция 
+        newVelocity2 = commonRatio * swarm.localVelocityRatio * random_currentPosition * (self._localBestPosition - self._position)#притяжение к локальному лучшему
+        newVelocity3 = commonRatio * swarm.globalVelocityRatio * random_globalPosition * (swarm.globalBestPosition - self._position)#притяжение к глобальному лучшему
 
         newVelocity = newVelocity1 + newVelocity2 + newVelocity3
 
         self._velocity = newVelocity
 
         self._position += self._velocity
-
+        #считаем значение функции в новой точке
         funcValue = swarm.getFuncValue(self._position)
-
+        #Если новая позиция лучше, она сохраняется как новое локальное лучшее
         if funcValue < self._localBestValue:
             self._localBestPosition = self._position[:]
             self._localBestValue = funcValue
@@ -61,12 +63,12 @@ class Swarm:
         self._swarmsize = swarmsize
         self._minvalues = np.array(minvalues[:])
         self._maxvalues = np.array(maxvalues[:])
-        self._currentVelocityRatio = currentVelocityRatio
-        self._localVelocityRatio = localVelocityRatio
-        self._globalVelocityRatio = globalVelocityRatio
+        self._currentVelocityRatio = currentVelocityRatio #инерция
+        self._localVelocityRatio = localVelocityRatio#локальное лучшее 
+        self._globalVelocityRatio = globalVelocityRatio#глобальное лучшее
         self._globalBestValue = None
         self._globalBestPosition = None
-        self._penaltyRatio = penaltyRatio
+        self._penaltyRatio = penaltyRatio #коэффиценты штрафов
 
         self._swarm = self.createSwarm()
 
@@ -109,26 +111,26 @@ class Swarm:
     @property
     def dimension(self):
         return len(self._minvalues)
-
+    #Получить частицу по индексу
     def getParticle(self, index):
         return self._swarm[index]
-
+    #Создание частиц в рое
     def createSwarm(self):
         return [Particle(self) for _ in range(self._swarmsize)]
-    
+    #за итерацию  обновляем все частицы
     def nextIteration(self):
         for particle in self._swarm:
             particle.nextIteration(self)
     
     def getFuncValue(self, position):
         result = self._func(*position)
-
+        #Если это наилучшее значение из всех, сохраняется как глобальное
         if (self._globalBestValue is None) or (result < self._globalBestValue):
             self._globalBestValue = result
             self._globalBestPosition = position[:]
 
         return result + self.getPenalty(position)
-    
+    #если координата вне допустимого диапазона, добавляется штраф
     def getPenalty(self, position):
         penalty1 = sum([self._penaltyRatio*abs(coord-minval) for coord, minval in zip(position, self.minvalues) if coord < minval])
         penalty2 = sum([self._penaltyRatio*abs(coord-maxval) for coord, maxval in zip(position, self.maxvalues) if coord > maxval])
