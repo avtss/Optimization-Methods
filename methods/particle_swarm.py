@@ -1,3 +1,4 @@
+import time
 import numpy as np
 
 class Particle:
@@ -138,11 +139,11 @@ class Swarm:
         return penalty1 + penalty2
     
 
-def optimize(func, maxIter, swarmsize, bounds, currentVelocityRatio, localVelocityRatio, globalVelocityRatio, penaltyRatio):
+def optimize(func, maxIter, swarmsize, bounds, currentVelocityRatio, localVelocityRatio, globalVelocityRatio, penaltyRatio,verbose=True):
 
     # Инициализация параметров
     history = []
-
+    start_time = time.time()
     swarm = Swarm(func, swarmsize, bounds[:][0], bounds[:][1], currentVelocityRatio, localVelocityRatio, globalVelocityRatio, penaltyRatio)
 
     for i in range(maxIter):
@@ -153,7 +154,9 @@ def optimize(func, maxIter, swarmsize, bounds, currentVelocityRatio, localVeloci
             'y': swarm.globalBestPosition[1],
             'f_value': swarm.globalBestValue
         })
-
+    
+    if verbose:
+        print(f"Время выполнения рой частиц: {time.time() - start_time:.2f} сек")
     # Формирование результата
     converged = True
     message = "Оптимум найден" if converged else "Достигнуто максимальное количество итераций"
