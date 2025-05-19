@@ -40,7 +40,10 @@ class Particle:
         #влияние локального и глобального лучшего решения
         velocityRatio = swarm.localVelocityRatio + swarm.globalVelocityRatio
         #Вычисляется коэффициент,используется для масштабирования всей скорости 
-        commonRatio = (2.0*swarm.currentVelocityRatio) / (np.abs(2.0 - velocityRatio - np.sqrt(velocityRatio**2 - 4.0*velocityRatio)))
+        under_sqrt = velocityRatio**2 - 4.0*velocityRatio
+        if under_sqrt < 0:
+            under_sqrt = 0  # или можно выбросить исключение, но обычно берут 0
+        commonRatio = (2.0*swarm.currentVelocityRatio) / (np.abs(2.0 - velocityRatio - np.sqrt(under_sqrt)))
 
         newVelocity1 = commonRatio * self._velocity #инерция 
         newVelocity2 = commonRatio * swarm.localVelocityRatio * random_currentPosition * (self._localBestPosition - self._position)#притяжение к локальному лучшему
@@ -139,13 +142,18 @@ class Swarm:
         return penalty1 + penalty2
     
 
-def optimize(func, maxIter, swarmsize, bounds, currentVelocityRatio, localVelocityRatio, globalVelocityRatio, penaltyRatio,verbose=True):
+def optimize(func, maxIter, swarmsize, bounds, currentVelocityRatio, localVelocityRatio, globalVelocityRatio, penaltyRatio,initial_positions = None, verbose=True):
 
     # Инициализация параметров
     history = []
     start_time = time.time()
     swarm = Swarm(func, swarmsize, bounds[:][0], bounds[:][1], currentVelocityRatio, localVelocityRatio, globalVelocityRatio, penaltyRatio)
-
+    if initial_positions is not None:
+        for i, pos in enumerate(initial_positions):
+            if i < len(swarm._swarm):
+                swarm._swarm[i]._position = np.array(pos)
+                swarm._swarm[i]._localBestPosition = np.array(pos)
+                swarm._swarm[i]._localBestValue = swarm.getFuncValue(pos)
     for i in range(maxIter):
         swarm.nextIteration()
         history.append({

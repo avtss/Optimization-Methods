@@ -18,7 +18,7 @@ methods = {
     "Пчелиный алгоритм": bee,
     "Искусственная иммунная сеть": immune,
     "Бактериальная оптимизация": bacterial,
-    "Гибридный алгоритм (PSO + Bees)": hybrid
+    "Гибридный алгоритм (GA + PSO)": hybrid
 
 }
 
@@ -511,7 +511,7 @@ def update_params(method_name):
             dbc.Button("Запустить", id='bacterial-run-button', color='primary', className='mt-3')
         ])
     
-    elif method_name == "Гибридный алгоритм (PSO + Bees)":
+    elif method_name == "Гибридный алгоритм (GA + PSO)":
         return html.Div([
             dbc.InputGroup([
                 dbc.InputGroupText("Функция"),
@@ -519,76 +519,44 @@ def update_params(method_name):
                     id="hybrid-function-dropdown",
                     options=[{"label": name, "value": optimization_functions[name]} for name in optimization_functions.keys()],
                     value="rosenbrock",
-                    clearable=False,
-                    style={'width': '100%'}
+                    clearable=False
                 )
             ], className='mb-2'),
             
             dbc.InputGroup([
-                dbc.InputGroupText("Размер роя"),
-                dbc.Input(id='hybrid-swarmsize-input', type='number', value=50)
+                dbc.InputGroupText("Размер популяции GA"),
+                dbc.Input(id='hybrid-ga-population', type='number', value=50)
             ], className='mb-2'),
 
             dbc.InputGroup([
-                dbc.InputGroupText("Макс. итераций"),
-                dbc.Input(id='hybrid-max-iter-input', type='number', value=100)
+                dbc.InputGroupText("Итерации GA"),
+                dbc.Input(id='hybrid-ga-iter', type='number', value=30)
             ], className='mb-2'),
 
             dbc.InputGroup([
-                dbc.InputGroupText("Интервал поиска (x)"),
-                dbc.Input(id='hybrid-x-min-input', type='number', value=-5),
-                dbc.Input(id='hybrid-x-max-input', type='number', value=5)
+                dbc.InputGroupText("Размер роя PSO"),
+                dbc.Input(id='hybrid-pso-swarm', type='number', value=30)
             ], className='mb-2'),
 
             dbc.InputGroup([
-                dbc.InputGroupText("Интервал поиска (y)"),
-                dbc.Input(id='hybrid-y-min-input', type='number', value=-5),
-                dbc.Input(id='hybrid-y-max-input', type='number', value=5)
+                dbc.InputGroupText("Итерации PSO"),
+                dbc.Input(id='hybrid-pso-iter', type='number', value=20)
             ], className='mb-2'),
 
             dbc.InputGroup([
-                dbc.InputGroupText("Инерционный вес (w)"),
-                dbc.Input(id='hybrid-w-input', type='number', value=0.7, step=0.1)
+                dbc.InputGroupText("Границы X"),
+                dbc.Input(id='hybrid-x-min', type='number', value=-5),
+                dbc.Input(id='hybrid-x-max', type='number', value=5)
             ], className='mb-2'),
 
             dbc.InputGroup([
-                dbc.InputGroupText("Когнитивный параметр (c1)"),
-                dbc.Input(id='hybrid-c1-input', type='number', value=1.5, step=0.1)
-            ], className='mb-2'),
-
-            dbc.InputGroup([
-                dbc.InputGroupText("Социальный параметр (c2)"),
-                dbc.Input(id='hybrid-c2-input', type='number', value=1.5, step=0.1)
-            ], className='mb-2'),
-
-            dbc.InputGroup([
-                dbc.InputGroupText("Кол-во пчел-разведчиков"),
-                dbc.Input(id='hybrid-scoutbees-input', type='number', value=20)
-            ], className='mb-2'),
-
-            dbc.InputGroup([
-                dbc.InputGroupText("Кол-во пчел на лучших участках"),
-                dbc.Input(id='hybrid-bestbees-input', type='number', value=30)
-            ], className='mb-2'),
-
-            dbc.InputGroup([
-                dbc.InputGroupText("Кол-во пчел на перспективных участках"),
-                dbc.Input(id='hybrid-selbees-input', type='number', value=15)
-            ], className='mb-2'),
-
-            dbc.InputGroup([
-                dbc.InputGroupText("Начальный радиус поиска"),
-                dbc.Input(id='hybrid-radius-input', type='number', value=0.5, step=0.1)
-            ], className='mb-2'),
-
-            dbc.InputGroup([
-                dbc.InputGroupText("Коэффициент изменения радиуса"),
-                dbc.Input(id='hybrid-koeff-input', type='number', value=0.9, step=0.1)
+                dbc.InputGroupText("Границы Y"),
+                dbc.Input(id='hybrid-y-min', type='number', value=-5),
+                dbc.Input(id='hybrid-y-max', type='number', value=5)
             ], className='mb-2'),
 
             dbc.Button("Запустить", id='hybrid-run-button', color='primary', className='mt-3')
         ])
-
     return html.Div()
 
 @app.callback(
@@ -667,8 +635,26 @@ def update_plot_and_table_genetic(n_clicks, func, chromosome_number, max_iter, x
     if None in [func, chromosome_number, max_iter, x_min, x_max, y_min, y_max, crossover_prob, mutation_prob, mutation_param, operations]:
         return go.Figure(), "Пожалуйста, заполните все поля", "", "danger"
 
-    return update_plot_and_table("genetic", func, *genetic_algorithm.optimize(func, [[x_min, x_max], [y_min, y_max]], {"crossover": "crossover" in operations, "mutation": "mutation" in operations}, chromosome_number, crossover_prob, mutation_prob, mutation_param, max_iter), {"bounds": [x_min, x_max, y_min, y_max]})
+    # Получаем все 4 значения из optimize
+    history, converged, message, population = genetic_algorithm.optimize(
+        func, 
+        [[x_min, x_max], [y_min, y_max]], 
+        {"crossover": "crossover" in operations, "mutation": "mutation" in operations}, 
+        chromosome_number, 
+        crossover_prob, 
+        mutation_prob, 
+        mutation_param, 
+        max_iter
+    )
 
+    return update_plot_and_table(
+        "genetic", 
+        func, 
+        history, 
+        converged, 
+        message, 
+        {"bounds": [x_min, x_max, y_min, y_max]}
+    )
 @app.callback(
     [Output('3d-plot', 'figure', allow_duplicate=True),
      Output('results-table', 'children', allow_duplicate=True),
@@ -808,6 +794,7 @@ def update_plot_and_table_bacterial(n_clicks, func, x_min, x_max, y_min, y_max, 
 
     return update_plot_and_table("bacterial", func, *bacterial.optimize(func, x_min, x_max, y_min, y_max, population_count, n_chemotaxis, n_reproduction, n_elimination, chemotaxis_step, elimination_threshold, elimination_probabilty, elimination_count), {"bounds": [x_min, x_max, y_min, y_max]})
 
+# app.py
 @app.callback(
     [Output('3d-plot', 'figure', allow_duplicate=True),
      Output('results-table', 'children', allow_duplicate=True),
@@ -815,58 +802,33 @@ def update_plot_and_table_bacterial(n_clicks, func, x_min, x_max, y_min, y_max, 
      Output('final-result', 'color', allow_duplicate=True)],
     [Input('hybrid-run-button', 'n_clicks')],
     [State('hybrid-function-dropdown', 'value'),
-     State('hybrid-swarmsize-input', 'value'),
-     State('hybrid-max-iter-input', 'value'),
-     State('hybrid-x-min-input', 'value'),
-     State('hybrid-x-max-input', 'value'),
-     State('hybrid-y-min-input', 'value'),
-     State('hybrid-y-max-input', 'value'),
-     State('hybrid-w-input', 'value'),
-     State('hybrid-c1-input', 'value'),
-     State('hybrid-c2-input', 'value'),
-     State('hybrid-scoutbees-input', 'value'),
-     State('hybrid-bestbees-input', 'value'),
-     State('hybrid-selbees-input', 'value'),
-     State('hybrid-radius-input', 'value'),
-     State('hybrid-koeff-input', 'value')],
+     State('hybrid-ga-population', 'value'),
+     State('hybrid-ga-iter', 'value'),
+     State('hybrid-pso-swarm', 'value'),
+     State('hybrid-pso-iter', 'value'),
+     State('hybrid-x-min', 'value'),
+     State('hybrid-x-max', 'value'),
+     State('hybrid-y-min', 'value'),
+     State('hybrid-y-max', 'value')],
     prevent_initial_call=True
 )
-def update_plot_and_table_hybrid(n_clicks, func, swarmsize, max_iter, x_min, x_max, y_min, y_max,
-                                w, c1, c2, scoutbees, bestbees, selbees, radius, koeff):
+def update_hybrid(n_clicks, func, ga_pop, ga_iters, pso_swarm, pso_iters, x_min, x_max, y_min, y_max):
     func = functions(func)
-    
-    if None in [func, swarmsize, max_iter, x_min, x_max, y_min, y_max, w, c1, c2, 
-               scoutbees, bestbees, selbees, radius, koeff]:
-        return go.Figure(), "Пожалуйста, заполните все поля", "", "danger"
-    
-    # Формируем bounds в правильном формате
-    bounds = [
-        [float(x_min), float(x_max)],
-        [float(y_min), float(y_max)]
-    ]
+    bounds = [[x_min, x_max], [y_min, y_max]]
     
     try:
         history, converged, message = hybrid.hybrid_optimize(
             func=func,
-            maxiter=max_iter,
-            swarmsize=swarmsize,
             bounds=bounds,
-            w=w,
-            c1=c1,
-            c2=c2,
-            scoutbee_count=scoutbees,
-            selectedbee_count=selbees,
-            bestbee_count=bestbees,
-            initial_radius=radius,
-            koeff=koeff
+            ga_population_size=ga_pop,
+            ga_max_iter=ga_iters,
+            pso_swarmsize=pso_swarm,
+            pso_max_iter=pso_iters
         )
     except Exception as e:
-        return go.Figure(), f"Ошибка выполнения: {str(e)}", "", "danger"
+        return go.Figure(), "", f"Ошибка: {str(e)}", "danger"
     
     return update_plot_and_table("hybrid", func, history, converged, message, {"bounds": [x_min, x_max, y_min, y_max]})
-
-
-
 
 def update_plot_and_table(method, func, history, converged, status_message, options=None, optional_options=None):
     if options is None:

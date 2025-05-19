@@ -1,5 +1,6 @@
 import numpy as np
 
+import time
 def functions(function_name):
     s = function_name.lower()
     match s:
@@ -14,11 +15,11 @@ def functions(function_name):
 
 def optimize(objective_func, bounds, used_methods={"crossover": True, "mutation": True}, population_size=50, #Это число определяет, сколько решений будет рассмотрено в процессе эволюции.
              crossover_prob=0.8, mutation_prob=0.1, mutation_parameter=3,
-             max_iter=100, tol=1e-6, patience=25):
+             max_iter=100, tol=1e-6, patience=25,verbose = True):
 
     # Инициализация параметров
     history = []
-
+    start_time = time.time()
     # 1. Генерация начальной популяции
     population = np.zeros((population_size, 2))
     population[:, 0] = np.random.uniform(bounds[0][0], bounds[0][1], population_size)
@@ -102,9 +103,10 @@ def optimize(objective_func, bounds, used_methods={"crossover": True, "mutation"
                 temporary_population.append(child)
 
         population = np.array(temporary_population) #обновление популяции
-   
+    if verbose:
+        print(f"Время выполнения генетического: {time.time() - start_time:.2f} сек")
     # Формирование результата
     converged = True
     message = "Оптимум найден" if converged else "Достигнуто максимальное количество итераций"
     
-    return history, converged, message
+    return history, converged, message, population
